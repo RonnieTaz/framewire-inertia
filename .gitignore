@@ -1,0 +1,6 @@
+# IDE Files
+/.idea
+/.vscode
+
+# Dependencies
+/vendor
