@@ -19,17 +19,17 @@ class Inertia implements InertiaInterface
 {
     use ReflectsProperties;
 
-    private Request $request;
+    private ?Request $request;
     private ?InertiaViewProviderInterface $viewProvider;
     private ?ContainerInterface $container;
     private Page $page;
 
     /**
-     * @param Request $request
+     * @param Request|null $request The request that triggered this view. It can be passed in the constructor or through the setter.
      * @param InertiaViewProviderInterface|null $viewProvider
      * @param ContainerInterface|null $container
      */
-    public function __construct(Request $request, ?InertiaViewProviderInterface $viewProvider = null, ?ContainerInterface $container = null)
+    public function __construct(?Request $request = null, ?InertiaViewProviderInterface $viewProvider = null, ?ContainerInterface $container = null)
     {
         $this->request = $request;
         $this->viewProvider = $viewProvider;
@@ -38,9 +38,15 @@ class Inertia implements InertiaInterface
     }
 
     /**
-     * @throws ReflectionException|ContainerExceptionInterface
+     * @param string $component Path to the component
+     * @param array $props Props to be passed to the component
+     * @param int $statusCode Response code
+     * @param array $headers Response Headers
+     * @return Response
+     * @throws ContainerExceptionInterface
+     * @throws ReflectionException
      */
-    public function render(string $component, array $props = []): Response
+    public function render(string $component, array $props = [], int $statusCode = 200, array $headers = []): Response
     {
         $this->page = $this->page->withComponent($component)->withUrl($this->request->getUri());
 
@@ -61,7 +67,7 @@ class Inertia implements InertiaInterface
 
         if ($this->request->headers->has('X-Inertia')) {
             $json = json_encode($this->page);
-            return $this->createResponse($json, 'application/json');
+            return $this->createResponse($json, 'application/json', $statusCode, $headers);
         }
 
         $rootViewProvider = $this->viewProvider;
@@ -92,7 +98,18 @@ class Inertia implements InertiaInterface
         }
 
         $html = $rootViewProvider($this->page);
-        return $this->createResponse($html, 'text/html; charset=UTF-8');
+        return $this->createResponse($html, 'text/html; charset=UTF-8', $statusCode, $headers);
+    }
+
+    /**
+     * @param Request $request
+     * @return Inertia
+     */
+    public function setRequest(Request $request): self
+    {
+        $this->request = $request;
+
+        return $this;
     }
 
     public function version(string $version): Page
@@ -110,8 +127,8 @@ class Inertia implements InertiaInterface
         return $this->page->getVersion();
     }
 
-    private function createResponse(string $data, string $contentType): StreamedResponse
+    private function createResponse(string $data, string $contentType, int $code, array $headers): StreamedResponse
     {
-        return new StreamedResponse(fn () => printf($data), 200, ['Content-Type' => $contentType]);
+        return new StreamedResponse(fn () => printf($data), $code, ['Content-Type' => $contentType, ...$headers]);
     }
 }
